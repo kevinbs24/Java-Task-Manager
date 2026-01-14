@@ -5,45 +5,59 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class Main {
-	
-	// Save tasks to a file
-	public static void saveTasks(ArrayList<String> tasks) {
-	    try {
-	        FileWriter writer = new FileWriter("tasks.txt");
-	        for (String task : tasks) {
-	            writer.write(task + "\n");
-	        }
-	        writer.close();
-	        System.out.println("Tasks saved to file.");
-	    } catch (IOException e) {
-	        System.out.println("Error saving tasks: " + e.getMessage());
-	    }
+
+	/*
+	 * gson.toJson(tasks, writer) converts your entire list of Task objects No loops
+	 * No formatting logic Pure data serialization
+	 */
+	public static void saveTasks(ArrayList<Task> tasks) {
+		Gson gson = new Gson();
+
+		try (FileWriter writer = new FileWriter("tasks.json")) {
+			gson.toJson(tasks, writer);
+			System.out.println("Tasks saved to JSON file.");
+		} catch (IOException e) {
+			System.out.println("Error saving tasks: " + e.getMessage());
+		}
 	}
 
-	// Load tasks from a file
-	public static void loadTasks(ArrayList<String> tasks) {
-	    try {
-	        File file = new File("tasks.txt");
-	        if (file.exists()) {
-	            Scanner fileReader = new Scanner(file);
-	            while (fileReader.hasNextLine()) {
-	                String task = fileReader.nextLine();
-	                tasks.add(task);
-	            }
-	            fileReader.close();
-	            System.out.println("Tasks loaded from file.");
-	        }
-	    } catch (IOException e) {
-	        System.out.println("Error loading tasks: " + e.getMessage());
-	    }
-	}
+	/*
+	 * Java loses generic type info at runtime (type erasure). This line: new
+	 * TypeToken<ArrayList<Task>>() {}.getType() Tells Gson: “This is a list of Task
+	 * objects, not just a list.”
+	 */
+	public static void loadTasks(ArrayList<Task> tasks) {
+		File file = new File("tasks.json");
 
+		if (!file.exists()) {
+			return;
+		}
+
+		Gson gson = new Gson();
+
+		try (Scanner scanner = new Scanner(file)) {
+			String json = scanner.useDelimiter("\\A").next();
+
+			ArrayList<Task> loadedTasks = gson.fromJson(json, new TypeToken<ArrayList<Task>>() {
+			}.getType());
+
+			if (loadedTasks != null) {
+				tasks.addAll(loadedTasks);
+			}
+
+			System.out.println("Tasks loaded from JSON file.");
+		} catch (Exception e) {
+			System.out.println("Error loading tasks: " + e.getMessage());
+		}
+	}
 
 	public static void main(String[] args) {
-		
-		ArrayList<String> tasks = new ArrayList<>();
+
+		ArrayList<Task> tasks = new ArrayList<>();
 		loadTasks(tasks); // Load from file on startup
 		Scanner scanner = new Scanner(System.in);
 		boolean running = true;
@@ -66,7 +80,8 @@ public class Main {
 			case 1:
 				System.out.print("Enter task description: ");
 				String newTask = scanner.nextLine();
-				tasks.add(newTask);
+				int id = tasks.size() + 1;
+				tasks.add(new Task(id, newTask));
 				saveTasks(tasks);
 				System.out.println("Task added.");
 				break;
@@ -77,7 +92,9 @@ public class Main {
 				} else {
 					System.out.println("Your Tasks:");
 					for (int i = 0; i < tasks.size(); i++) {
-						System.out.println(i + ": " + tasks.get(i));
+						for (Task task : tasks) {
+							System.out.println(task);
+						}
 					}
 				}
 				break;
@@ -89,7 +106,10 @@ public class Main {
 				if (updateIndex >= 0 && updateIndex < tasks.size()) {
 					System.out.print("Enter new task description: ");
 					String updatedTask = scanner.nextLine();
-					tasks.set(updateIndex, updatedTask);
+
+					Task task = tasks.get(updateIndex);
+					task.setDescription(updatedTask);
+
 					saveTasks(tasks);
 					System.out.println("Task updated.");
 				} else {
